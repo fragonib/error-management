@@ -1,13 +1,12 @@
 package com.example.demo
 
 import arrow.core.Either
-import arrow.core.None
 import arrow.core.Option
-import arrow.core.Some
 import arrow.core.continuations.Effect
 import arrow.core.continuations.EffectScope
 import arrow.core.continuations.effect
 import arrow.core.continuations.either
+import arrow.core.getOrElse
 
 /**
  * Model
@@ -33,9 +32,9 @@ suspend fun Person.address(): Either<AddressStatus, Address> =
 sealed class AddressStatus {
     object Relocating : AddressStatus()
     object Missing : AddressStatus()
-    object ServiceIsDown: AddressStatus()
+    object ServiceIsDown : AddressStatus()
 
-    override fun toString() : String {
+    override fun toString(): String {
         return this.javaClass.simpleName
     }
 }
@@ -43,14 +42,13 @@ sealed class AddressStatus {
 /**
  * [RuntimeException].
  * Good: `Code` is a simple return type
- * Bad: Caller does not know this throws
+ * Bad: Caller does not know this function throws
  * Ugly: Can crash your application
  */
 suspend fun Person.countryCodeExceptions(): Code =
-        when (val address = address()) {
-            is Either.Left -> throw RuntimeException(address.value.toString()) // costly to create stack trace
-            is Either.Right -> address.value.country.code
-        }
+        address()
+                .map { it.country.code }
+                .getOrElse { throw RuntimeException(it.toString()) } // Costly to create stack trace
 
 /**
  * [Option]
@@ -60,10 +58,7 @@ suspend fun Person.countryCodeExceptions(): Code =
  * Ugly: New allocations for composition
  */
 suspend fun Person.countryCodeOption(): Option<Code> =
-        when (val address = address()) {
-            is Either.Left -> None
-            is Either.Right -> Some(address.value.country.code)
-        }
+        address().orNone().map { it.country.code }
 
 /**
  * [Either]
@@ -72,13 +67,10 @@ suspend fun Person.countryCodeOption(): Option<Code> =
  * Ugly: New allocations for composition
  */
 suspend fun Person.countryCodeEither(): Either<AddressStatus, Code> =
-        when (val address = address()) {
-            is Either.Left -> address
-            is Either.Right -> Either.Right(address.value.country.code)
-        }
+        address().map { it.country.code }
 
 /**
- * [either] DSL
+ * [Effect] [Either] DSL
  * Good: Caller needs to handle, we recover info why address may not be there,
  * better monadic syntax
  * Bad: Caller needs to deal with boxed types
@@ -88,11 +80,10 @@ suspend fun Person.countryCodeEitherDSL(): Either<AddressStatus, Code> =
         either { address().bind().country.code }
 
 /**
- * [Raise]
+ * [Effect]
  * Good: Caller needs to handle, direct syntax
  * Bad?: We are back to a form of typed exceptions
  * Ugly?: Need to learn context receivers.
- *
  */
 context(EffectScope<AddressStatus>)
 suspend fun Person.countryCode(): Code =
