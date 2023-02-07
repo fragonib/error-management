@@ -1,4 +1,4 @@
-package com.example.demo
+package kotlin.arrow
 
 import arrow.core.Either
 import arrow.core.Option
