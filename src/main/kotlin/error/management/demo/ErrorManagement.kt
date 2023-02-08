@@ -1,4 +1,4 @@
-package kotlin.arrow
+package error.management.demo
 
 import arrow.core.Either
 import arrow.core.Option
@@ -58,7 +58,9 @@ suspend fun Person.countryCodeExceptions(): Code =
  * Ugly: New allocations for composition
  */
 suspend fun Person.countryCodeOption(): Option<Code> =
-        address().orNone().map { it.country.code }
+        address()
+                .map { it.country.code }
+                .orNone()
 
 /**
  * [Either]
@@ -105,18 +107,23 @@ suspend fun Person /* Receiver */.countryCodeRaised(): Code /* <-- Simple return
 
 suspend fun main() {
 
-    val j = Person("Fran")
+    val person = Person("Fran")
 
-    // val program: Code = j.countryCodeExceptions() // java.lang.RuntimeException: com.example.demo.AddressStatus$ServiceIsDown
-    val programOption: Option<Code> = j.countryCodeOption()  // we don't know why it failed
-    println(programOption) // None
+    val program: Result<Code> = runCatching { person.countryCodeExceptions() }
+    println(program)  // Failure(java.lang.RuntimeException: ServiceIsDown)
 
-    val programEither: Either<AddressStatus, Code> = j.countryCodeEither() // we have to deal with boxes
-    println(programEither) // Left
+    val programOption: Option<Code> = person.countryCodeOption()  // we don't know why it failed
+    println(programOption) // Option.None
+
+    val programEither: Either<AddressStatus, Code> = person.countryCodeEither() // we have to deal with boxes
+    println(programEither) // Either.Left(ServiceIsDown)
+
+    val programEitherDsl: Either<AddressStatus, Code> = person.countryCodeEitherDSL() // we have to deal with boxes
+    println(programEither) // Either.Left(ServiceIsDown)
 
     // Effects are controlled as a function until the edge.
     // At that point they can be folded to a terminal value
-    val programEffect: Effect<AddressStatus, Code> = effect { j.countryCodeRaised() } // at the edge we wrap in effect
+    val programEffect: Effect<AddressStatus, Code> = effect { person.countryCodeRaised() } // at the edge we wrap in effect
     println(programEffect.toEither()) // Left
 
 }
